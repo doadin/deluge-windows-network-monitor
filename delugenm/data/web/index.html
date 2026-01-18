@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Network Monitor Settings</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #333;
+        }
+        input[type="number"],
+        textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+        input[type="number"] {
+            max-width: 150px;
+        }
+        textarea {
+            height: 120px;
+            resize: vertical;
+        }
+        .info-text {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s;
+        }
+        .btn-save {
+            background-color: #007bff;
+            color: white;
+        }
+        .btn-save:hover {
+            background-color: #0056b3;
+        }
+        .btn-refresh {
+            background-color: #6c757d;
+            color: white;
+        }
+        .btn-refresh:hover {
+            background-color: #545b62;
+        }
+        .message {
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+            display: none;
+        }
+        .message.success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+            display: block;
+        }
+        .message.error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+            display: block;
+        }
+        .loading {
+            display: none;
+            color: #666;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Network Monitor Settings</h1>
+        
+        <div id="message" class="message"></div>
+        <div id="loading" class="loading">Loading configuration...</div>
+        
+        <form id="configForm">
+            <div class="form-group">
+                <label for="checkInterval">Check Interval (seconds):</label>
+                <input type="number" id="checkInterval" name="checkInterval" min="1" max="300" value="5">
+                <div class="info-text">How often to check network adapter status (1-300 seconds)</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="requiredAdapters">Required Network Adapters:</label>
+                <textarea id="requiredAdapters" name="requiredAdapters" placeholder="Enter adapter names separated by commas or newlines&#10;Leave empty to monitor all adapters"></textarea>
+                <div class="info-text">Enter network adapter names separated by commas or newlines. Leave empty to monitor all active adapters.</div>
+            </div>
+            
+            <div class="button-group">
+                <button type="button" class="btn-save" onclick="saveConfig()">Save Configuration</button>
+                <button type="button" class="btn-refresh" onclick="loadConfig()">Refresh</button>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        // API base URL
+        const API_BASE = '/api/plugins/deluge_windows_network_monitor';
+
+        function showMessage(message, isError = false) {
+            const messageDiv = document.getElementById('message');
+            messageDiv.textContent = message;
+            messageDiv.className = 'message ' + (isError ? 'error' : 'success');
+            
+            // Auto-hide success messages after 3 seconds
+            if (!isError) {
+                setTimeout(() => {
+                    messageDiv.className = 'message';
+                }, 3000);
+            }
+        }
+
+        function loadConfig() {
+            document.getElementById('loading').style.display = 'block';
+            
+            fetch(API_BASE + '/get_config')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('loading').style.display = 'none';
+                    
+                    if (data.error) {
+                        showMessage('Error: ' + data.error, true);
+                    } else {
+                        document.getElementById('checkInterval').value = data.check_interval || 5;
+                        document.getElementById('requiredAdapters').value = (data.required_adapters || []).join('\n');
+                        showMessage('Configuration loaded successfully');
+                    }
+                })
+                .catch(error => {
+                    document.getElementById('loading').style.display = 'none';
+                    showMessage('Error loading configuration: ' + error.message, true);
+                });
+        }
+
+        function saveConfig() {
+            const checkInterval = document.getElementById('checkInterval').value;
+            const requiredAdapters = document.getElementById('requiredAdapters').value;
+
+            // Parse adapters
+            const adapters = requiredAdapters
+                .split(/[\n,]/)
+                .map(a => a.trim())
+                .filter(a => a.length > 0);
+
+            const params = new URLSearchParams({
+                check_interval: checkInterval,
+                required_adapters: JSON.stringify(adapters)
+            });
+
+            fetch(API_BASE + '/set_config', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: params
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    showMessage('Error: ' + data.error, true);
+                } else {
+                    showMessage('Configuration saved successfully!');
+                }
+            })
+            .catch(error => {
+                showMessage('Error saving configuration: ' + error.message, true);
+            });
+        }
+
+        // Load configuration when page loads
+        window.addEventListener('load', loadConfig);
+    </script>
+</body>
+</html>

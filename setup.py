@@ -7,16 +7,16 @@ setup(
     name="deluge-windows-network-monitor",
     version="1.0.0",
     description="Windows Network Monitor - Deluge plugin that shuts down when network interface is disconnected",
-    author="Your Name",
-    author_email="your.email@example.com",
+    author="Doadin",
+    author_email="",
     url="https://github.com/doadin/deluge-windows-network-monitor",
     license="GPL-3.0",
     packages=find_packages(),
     package_data={
-        'delugenm': ['gtk/plugins.ui', 'data/pixmaps/*']
+        'deluge_windows_network_monitor': ['gtk/plugins.ui', 'data/pixmaps/*']
     },
     entry_points={
-        'deluge.plugin': 'delugenm = delugenm:plugin_base',
+        'deluge.plugin': 'deluge_windows_network_monitor = deluge_windows_network_monitor:plugin_base',
     },
     install_requires=[
         'deluge',

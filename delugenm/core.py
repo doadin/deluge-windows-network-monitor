@@ -15,6 +15,7 @@ except ImportError:
 
 from deluge.core.pluginmanager import CorePluginBase
 from deluge import component
+from deluge.configmanager import ConfigManager
 
 log = logging.getLogger(__name__)
 
@@ -45,8 +46,27 @@ class Core(CorePluginBase):
         log.info("Network Monitor plugin enabled")
         self.monitor_thread = None
         self.monitoring = False
-        self.check_interval = 5  # seconds
-        self.required_adapters = []  # If empty, monitor all adapters
+        
+        # Load configuration
+        self.config = ConfigManager("deluge_windows_network_monitor.conf", defaults={
+            "check_interval": 5,
+            "required_adapters": []
+        })
+        
+        self.check_interval = self.config["check_interval"]
+        self.required_adapters = self.config["required_adapters"].copy() if self.config["required_adapters"] else []
+        
+        # Add Deluge's configured network interface if set
+        deluge_config = ConfigManager("core.conf")
+        deluge_interface = deluge_config.get("listen_interface")
+        if deluge_interface:
+            # Get the network adapter name associated with this interface
+            adapter_name = self._get_adapter_for_interface(deluge_interface)
+            if adapter_name and adapter_name not in self.required_adapters:
+                self.required_adapters.append(adapter_name)
+                log.info(f"Added Deluge interface adapter '{adapter_name}' to required_adapters")
+        
+        log.info(f"Configuration loaded - check_interval: {self.check_interval}s, required_adapters: {self.required_adapters}")
         
         self._start_monitoring()
     
@@ -99,7 +119,6 @@ class Core(CorePluginBase):
             active_adapters = []
             
             for nic in c.Win32_NetworkAdapter():
-                # Skip disabled or disconnected adapters
                 if not nic.NetEnabled:
                     continue
                 
@@ -131,6 +150,32 @@ class Core(CorePluginBase):
             log.error(f"Error checking network status: {e}")
             return True  # Assume OK on error to avoid false shutdowns
     
+    def _get_adapter_for_interface(self, interface_ip):
+        """
+        Get the network adapter name for a given IP interface.
+        """
+        if not WMI_AVAILABLE:
+            return None
+        
+        try:
+            c = wmi.WMI()
+            # Search for network adapter configuration with matching IP address
+            for ip_config in c.Win32_NetworkAdapterConfiguration():
+                if not ip_config.IPAddress:
+                    continue
+                
+                # Check if the interface IP is in this adapter's IP list
+                if interface_ip in ip_config.IPAddress:
+                    # Find the corresponding adapter
+                    for nic in c.Win32_NetworkAdapter():
+                        if nic.Index == ip_config.Index:
+                            return nic.Name
+            
+            return None
+        except Exception as e:
+            log.error(f"Error getting adapter for interface {interface_ip}: {e}")
+            return None
+    
     def _shutdown_deluge(self):
         """Shutdown Deluge"""
         try:
@@ -139,6 +184,27 @@ class Core(CorePluginBase):
             component.get("Daemon").shutdown()
         except Exception as e:
             log.error(f"Error shutting down Deluge: {e}")
+    
+    def update_config(self, **kwargs):
+        """Update configuration settings"""
+        if "check_interval" in kwargs:
+            self.check_interval = kwargs["check_interval"]
+            self.config["check_interval"] = self.check_interval
+            log.info(f"Updated check_interval to {self.check_interval}s")
+        
+        if "required_adapters" in kwargs:
+            self.required_adapters = kwargs["required_adapters"]
+            self.config["required_adapters"] = self.required_adapters
+            log.info(f"Updated required_adapters to {self.required_adapters}")
+        
+        self.config.save()
+    
+    def get_config(self):
+        """Get current configuration"""
+        return {
+            "check_interval": self.check_interval,
+            "required_adapters": self.required_adapters
+        }
     
     def update(self):
         """Called when config is updated"""

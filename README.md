@@ -74,7 +74,7 @@ self.required_adapters = ["Ethernet", "WiFi"]  # List your adapter names
 Check Deluge logs to see plugin activity:
 - Windows: `%APPDATA%\Deluge\deluge.log`
 
-Look for entries from "delugenm" logger.
+Look for entries from "deluge_windows_network_monitor" logger.
 
 ## Troubleshooting
 

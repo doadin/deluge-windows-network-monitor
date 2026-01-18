@@ -19,8 +19,6 @@ def build_plugin():
         print("\nTo install:")
         print("  Copy the .egg file to your Deluge plugins directory")
         print("  Windows: %APPDATA%\\Deluge\\plugins\\")
-        print("  Linux: ~/.config/deluge/plugins/")
-        print("  macOS: ~/.config/deluge/plugins/")
         return True
     else:
         print("\n✗ Build failed. Check errors above.")
