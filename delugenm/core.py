@@ -39,36 +39,40 @@ ACTIVE_STATUSES = {STATUS_CONNECTED, STATUS_AUTHENTICATION_SUCCEEDED}
 class Core(CorePluginBase):
     def enable(self):
         """Enable the plugin"""
-        if not WMI_AVAILABLE:
-            log.error("WMI module not available. Install pywin32 to use this plugin.")
-            return
-        
-        log.info("Network Monitor plugin enabled")
-        self.monitor_thread = None
-        self.monitoring = False
-        
-        # Load configuration
-        self.config = ConfigManager("deluge_windows_network_monitor.conf", defaults={
-            "check_interval": 5,
-            "required_adapters": []
-        })
-        
-        self.check_interval = self.config["check_interval"]
-        self.required_adapters = self.config["required_adapters"].copy() if self.config["required_adapters"] else []
-        
-        # Add Deluge's configured network interface if set
-        deluge_config = ConfigManager("core.conf")
-        deluge_interface = deluge_config.get("listen_interface")
-        if deluge_interface:
-            # Get the network adapter name associated with this interface
-            adapter_name = self._get_adapter_for_interface(deluge_interface)
-            if adapter_name and adapter_name not in self.required_adapters:
-                self.required_adapters.append(adapter_name)
-                log.info(f"Added Deluge interface adapter '{adapter_name}' to required_adapters")
-        
-        log.info(f"Configuration loaded - check_interval: {self.check_interval}s, required_adapters: {self.required_adapters}")
-        
-        self._start_monitoring()
+        try:
+            if not WMI_AVAILABLE:
+                log.error("WMI module not available. Install pywin32 to use this plugin.")
+                return
+            
+            log.info("Network Monitor plugin enabled")
+            self.monitor_thread = None
+            self.monitoring = False
+            
+            # Load configuration
+            self.config = ConfigManager("deluge_windows_network_monitor.conf", defaults={
+                "check_interval": 5,
+                "required_adapters": []
+            })
+            
+            self.check_interval = self.config["check_interval"]
+            self.required_adapters = self.config["required_adapters"].copy() if self.config["required_adapters"] else []
+            
+            # Add Deluge's configured network interface if set
+            deluge_config = ConfigManager("core.conf")
+            deluge_interface = deluge_config.get("listen_interface")
+            if deluge_interface:
+                # Get the network adapter name associated with this interface
+                adapter_name = self._get_adapter_for_interface(deluge_interface)
+                if adapter_name and adapter_name not in self.required_adapters:
+                    self.required_adapters.append(adapter_name)
+                    log.info(f"Added Deluge interface adapter '{adapter_name}' to required_adapters")
+            
+            log.info(f"Configuration loaded - check_interval: {self.check_interval}s, required_adapters: {self.required_adapters}")
+            
+            self._start_monitoring()
+        except Exception as e:
+            log.error(f"Error enabling Network Monitor plugin: {e}", exc_info=True)
+            raise
     
     def disable(self):
         """Disable the plugin"""
